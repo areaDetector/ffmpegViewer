@@ -1,16 +1,11 @@
-TARGET = ffmpegViewer
-HEADERS += SSpinBox.h caValueMonitor.h
-SOURCES += ffmpegViewer.cpp SSpinBox.cpp caValueMonitor.cpp
-FORMS += ffmpegViewer.ui  
+TARGET = ffmpegWebcam4
+SOURCES += ffmpegWebcam4.cpp
+FORMS += ffmpegWebcam4.ui  
 target.path = ../../prefix/bin
 INSTALLS += target
 INCLUDEPATH += ../ffmpegWidget
 LIBS += -L../ffmpegWidget -lffmpegWidget
 QMAKE_CLEAN += $$TARGET
-
-# epics base stuff
-INCLUDEPATH += $$(EPICS_BASE)/include $$(EPICS_BASE)/include/os/Linux
-LIBS += -L$$(EPICS_BASE)/lib/linux-x86_64 -lca
 
 # ffmpeg stuff
 INCLUDEPATH += $$(FFMPEG_PREFIX)/include
@@ -19,3 +14,4 @@ DEFINES += __STDC_CONSTANT_MACROS
 
 # xvideo stuff
 LIBS += -lXv
+

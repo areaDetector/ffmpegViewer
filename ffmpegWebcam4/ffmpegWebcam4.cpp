@@ -1,4 +1,4 @@
-#include "ui_webcam4.h"
+#include "ui_ffmpegWebcam4.h"
 #include <QApplication>
 
 int main(int argc, char *argv[])
