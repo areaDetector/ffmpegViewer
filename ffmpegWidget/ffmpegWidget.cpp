@@ -109,100 +109,114 @@ FFThread::~FFThread() {
 // run the FFThread
 void FFThread::run()
 {
+    int                 firstrun = 1;
     AVFormatContext     *pFormatCtx=NULL;
     int                 videoStream;
     AVCodecContext      *pCodecCtx;
     AVCodec             *pCodec;
     AVPacket            packet;
     int                 frameFinished, len;
+    AVFrame             *tmpFrame = avcodec_alloc_frame();
 
-    // Open video file
-    if (avformat_open_input(&pFormatCtx, this->url, NULL, NULL)!=0) {
-        printf("Opening input '%s' failed\n", this->url);
-        return;
-    }
-
-    // Find the first video stream
-    videoStream=-1;
-    for (unsigned int i=0; i<pFormatCtx->nb_streams; i++) {
-        if(pFormatCtx->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO) {
-            videoStream=i;
-            break;
+    while (True) {
+        if (firstrun) {
+            firstrun = 0;
+        } else{            
+            // wait for 10s to avoid spinning
+            sleep(10);
         }
-    }
-    if( videoStream==-1) {
-        printf("Finding video stream in '%s' failed\n", this->url);
-        return;
-    }
-
-    // Get a pointer to the codec context for the video stream
-    pCodecCtx=pFormatCtx->streams[videoStream]->codec;
-
-    // Find the decoder for the video stream
-    pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
-    if(pCodec==NULL) {
-        printf("Could not find decoder for '%s'\n", this->url);
-        return;
-    }
-
-    // Open codec
-    ffmutex->lock();
-    if(avcodec_open2(pCodecCtx, pCodec, NULL)<0) {
-        printf("Could not open codec for '%s'\n", this->url);
-        return;
-    }
-    ffmutex->unlock();
-
-    // read frames into the packets
-    while (stopping !=1 && av_read_frame(pFormatCtx, &packet) >= 0) {
-
-        // Is this a packet from the video stream?
-        if (packet.stream_index!=videoStream) {
-            // Free the packet if not
-            printf("Non video packet. Shouldn't see this...\n");
-            av_free_packet(&packet);
+        
+        // Open video file
+        printf("Open %s\n", this->url);
+        if (avformat_open_input(&pFormatCtx, this->url, NULL, NULL)!=0) {
+            printf("Opening input '%s' failed\n", this->url);
             continue;
         }
 
-        // grab a buffer to decode into
-        FFBuffer *raw = findFreeBuffer(rawbuffers);        
-        if (raw == NULL) {
-            printf("Couldn't get a free buffer, skipping packet\n");
-            av_free_packet(&packet);
+        // Find the first video stream
+        videoStream=-1;
+        for (unsigned int i=0; i<pFormatCtx->nb_streams; i++) {
+            if(pFormatCtx->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO) {
+                videoStream=i;
+                break;
+            }
+        }
+        if( videoStream==-1) {
+            printf("Finding video stream in '%s' failed\n", this->url);
             continue;
         }
-        
-        // Tell the codec to use this bit of memory
-        //pCodecCtx->internal->buffer->data = raw->mem;
 
-        // Decode video frame
-        len = avcodec_decode_video2(pCodecCtx, raw->pFrame, &frameFinished,
-            &packet);
-        if (!frameFinished) {
-            printf("Frame not finished. Shouldn't see this...\n");
-            av_free_packet(&packet);
-            raw->release();
+        // Get a pointer to the codec context for the video stream
+        pCodecCtx=pFormatCtx->streams[videoStream]->codec;
+
+        // Find the decoder for the video stream
+        pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
+        if(pCodec==NULL) {
+            printf("Could not find decoder for '%s'\n", this->url);
             continue;
         }
-        
-        // Set the internal buffer back to null so that we don't accidentally free it
-        //pCodecCtx->internal->buffer->data = NULL;
-        
-        // Fill in the output buffer
-        raw->pix_fmt = pCodecCtx->pix_fmt;         
-        raw->height = pCodecCtx->height;
-        raw->width = pCodecCtx->width;                
 
-        // Emit and free
-        emit updateSignal(raw);
-        av_free_packet(&packet);
+        // Open codec
+        ffmutex->lock();
+        if(avcodec_open2(pCodecCtx, pCodec, NULL)<0) {
+            printf("Could not open codec for '%s'\n", this->url);
+            continue;
+        }
+        ffmutex->unlock();
+
+        // read frames into the packets
+        while (stopping !=1 && av_read_frame(pFormatCtx, &packet) >= 0) {
+
+            // Is this a packet from the video stream?
+            if (packet.stream_index!=videoStream) {
+                // Free the packet if not
+                printf("Non video packet. Shouldn't see this...\n");
+                av_free_packet(&packet);
+                continue;
+            }
+
+            // grab a buffer to decode into
+            FFBuffer *raw = findFreeBuffer(rawbuffers);        
+            if (raw == NULL) {
+                printf("Couldn't get a free buffer, skipping packet\n");
+                av_free_packet(&packet);
+                continue;
+            }
+
+            // Decode video frame
+            len = avcodec_decode_video2(pCodecCtx, tmpFrame, &frameFinished, &packet);
+            if (!frameFinished) {
+                printf("Frame not finished. Shouldn't see this...\n");
+                av_free_packet(&packet);
+                raw->release();
+                continue;
+            }
+            
+            // Copy it into the raw frame
+            avpicture_fill((AVPicture *) raw->pFrame, raw->mem,
+                pCodecCtx->pix_fmt, pCodecCtx->width, pCodecCtx->height);
+            av_picture_copy((AVPicture *) raw->pFrame, (const AVPicture *) tmpFrame,
+                pCodecCtx->pix_fmt, pCodecCtx->width, pCodecCtx->height); 
+                        
+            // Fill in the output buffer
+            raw->pix_fmt = pCodecCtx->pix_fmt;         
+            raw->height = pCodecCtx->height;
+            raw->width = pCodecCtx->width;                
+
+            // Emit and free
+            emit updateSignal(raw);        
+            av_free_packet(&packet);
+        }
+        // Emit blank frame
+        emit updateSignal(NULL);
+        
+        // tidy up
+        ffmutex->lock();
+        avcodec_close(pCodecCtx);
+        avformat_close_input(&pFormatCtx);
+        pCodecCtx = NULL;
+        ffmutex->unlock();        
     }
-    // tidy up
-    ffmutex->lock();
-    avcodec_close(pCodecCtx);
-    avformat_close_input(&pFormatCtx);
-    pCodecCtx = NULL;
-    ffmutex->unlock();
 }
 
 ffmpegWidget::ffmpegWidget (QWidget* parent)
@@ -476,9 +490,9 @@ void ffmpegWidget::updateImage(FFBuffer *newbuf) {
     // calculate fps
     int elapsed = this->lastFrameTime->elapsed();
     // limit framerate in fallback mode
-    if (this->rawbuf && this->xv_format < 0 && elapsed < 100) {
+    if (this->rawbuf && newbuf && this->xv_format < 0 && elapsed < 100) {
         this->limited = QString(" (limited)");
-        newbuf->release();
+        if (newbuf) newbuf->release();
         return;
     }
     this->lastFrameTime->start();
@@ -494,6 +508,16 @@ void ffmpegWidget::updateImage(FFBuffer *newbuf) {
     // store the buffer
     if (this->rawbuf) this->rawbuf->release();    
     this->rawbuf = newbuf;
+    
+    // if blank then just do an update
+    if (newbuf == NULL) {
+        // release any full frame we might have
+        if (this->fullbuf) this->fullbuf->release();        
+        this->fullbuf = NULL;
+        // update the screen to blank it
+        update();
+        return;
+    }    
     
     // make the frame the right format
     makeFullFrame();            
@@ -704,6 +728,10 @@ void ffmpegWidget::makeFullFrame() {
 void ffmpegWidget::paintEvent(QPaintEvent *) {
     // check we have a full buffer
     if (this->fullbuf == NULL || this->fullbuf->width <= 0 || this->fullbuf->height <= 0) {
+        if (this->xv_format >= 0) {
+            // xvideo supported    
+            XClearArea(this->dpy, this->w, 0, 0, this->widgetW, this->widgetH, 0);
+        }
         return;
     }
     // If scale factors have changed

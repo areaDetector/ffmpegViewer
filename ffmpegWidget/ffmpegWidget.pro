@@ -1,6 +1,6 @@
 TEMPLATE = lib
 CONFIG = staticlib
-CONFIG += qt
+CONFIG += qt debug
 HEADERS += colorMaps.h ffmpegWidget.h 
 SOURCES += ffmpegWidget.cpp
 QMAKE_CLEAN += libffmpegWidget.a
