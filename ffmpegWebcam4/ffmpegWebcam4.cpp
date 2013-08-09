@@ -8,12 +8,13 @@ int main(int argc, char *argv[])
 
     /* Parse the arguments */
     QString topleft, bottomleft, topright, bottomright, leftlabel, rightlabel;
-    char * usage = "Usage: %s [options] <topleft> <bottomleft> <topright> <bottomright> [<leftlabel=Optics Hutch>] [<rightlabel=Experimental Hutch>]\n\n" \
+    const char * usage = \
+        "Usage: %s [options] <topleft> <bottomleft> <topright> <bottomright> [<leftlabel=Optics Hutch>] [<rightlabel=Experimental Hutch>]\n\n" \
         "Where topleft .. bottom right are urls for ffmpeg streams\n" \
         "E.g. http://i11-webcam2.diamond.ac.uk/mjpg/video.mjpg\n\n" \
         "Options:\n" \
-        "\t-h\tShow this help message and quit\n" \
-        "\t-f\tFallback mode, don't try to use xvideo\n";
+        "  -h\tShow this help message and quit\n" \
+        "  -f\tFallback mode, don't try to use xvideo\n";
     for (int i = 1; i < app.arguments().size(); i++) {
         if (app.arguments().at(i) == "-f") {
             // fallback mode

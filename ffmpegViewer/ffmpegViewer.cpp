@@ -9,13 +9,19 @@ int main(int argc, char *argv[])
 
     /* Parse the arguments */
     QString url, prefix;
-    char * usage = "Usage: %s [options] <mjpg_url> [<CA prefix for grid>]\n\n" \
-        "\t-h\tShow this help message and quit\n" \
-        "\t-f\tFallback mode, don't try to use xvideo\n";
+    int closeDocks = 0;
+    const char * usage = \
+        "Usage: %s [options] <mjpg_url> [<CA prefix for grid>]\n\n" \
+        "  -h\tShow this help message and quit\n" \
+        "  -d\tDo not show docking controls on right of player window\n" \
+        "  -f\tFallback mode, don't try to use xvideo\n";
     for (int i = 1; i < app.arguments().size(); i++) {
         if (app.arguments().at(i) == "-f") {
             // fallback mode
             fallback = 1;
+        } else if (app.arguments().at(i) == "-d") {
+            // no docks
+            closeDocks = 1;            
         } else if (app.arguments().at(i) == "-h") {
             // asked for help
             printf(usage, argv[0]);
@@ -25,7 +31,7 @@ int main(int argc, char *argv[])
             url = app.arguments().at(i);
         } else if (prefix.isNull()) {
             // second positional arg is CA prefix
-            prefix = app.arguments().at(i);
+            prefix = app.arguments().at(i);            
         } else {
             // asked for help or too many args 
             printf(usage, argv[0]);
@@ -43,6 +49,14 @@ int main(int argc, char *argv[])
     QMainWindow *top = new QMainWindow;
     Ui::ffmpegViewer ui;
     ui.setupUi(top);
+    
+    /* Close docks if asked */
+    if (closeDocks) {
+        ui.imageDock->close();
+        ui.gridDock->close();        
+    }
+    
+    /* Set the url and start */
     ui.video->setUrl(url);
     top->setWindowTitle(QString("ffmpegViewer: %1").arg(url));
 
