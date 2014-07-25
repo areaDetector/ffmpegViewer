@@ -17,8 +17,9 @@ This application uses some 3rd party libraries:
 How to build
 ------------
 
-First ensure that you have the above 3rd party libraries installed. The Qt
-installation must be in your path.
+First ensure that you have the above 3rd party libraries installed. The Qt4
+installation must be in your path and an EPICS environment (particularly the 
+EPICS_BASE variable) must also be defined in the environment.
 
 Set the FFMPEG_PREFIX environment variable to point to the installation directory
 of your ffmpeg library. Then build using qmake, make, make install.
