@@ -1,0 +1,17 @@
+
+# No QT generated files to be stored
+Makefile
+*.pro
+moc_*
+ui_*
+*.o
+*.a
+*.lib
+*.so*
+ffmpegViewer/ffmpegViewer
+ffmpegWebcam4/ffmpegWebcam4
+
+# No backup files
+*~
+*.swp
+
